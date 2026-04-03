@@ -61,8 +61,8 @@ export default function StravaActivityCard({ activity }: Props) {
         <Text style={styles.healthData}>
           {/* On utilise directement la valeur kilojoules comme estimation fiable en kcal */}
           🔥{" "}
-          {activity.kilojoules
-            ? `${Math.round(activity.kilojoules)} kcal`
+          {activity.calories
+            ? `${Math.round(activity.calories)} kcal`
             : "-- kcal"}
         </Text>
       </View>

@@ -8,5 +8,5 @@ export interface StravaActivity {
   start_date: string;
   type: string; // <-- Ajout pour le filtrage
   average_heartrate?: number;
-  kilojoules?: number;
+  calories?: number;
 }

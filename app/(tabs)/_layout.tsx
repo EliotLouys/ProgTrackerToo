@@ -7,8 +7,9 @@ export default function TabLayout() {
   return (
     <StravaProvider>
       <Tabs screenOptions={{ tabBarActiveTintColor: "#fc4c02" }}>
+        <Tabs.Screen name="index" options={{ headerShown: false, href: null }} />
         <Tabs.Screen
-          name="index"
+          name="dashboard"
           options={{
             title: "Dashboard",
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>Dashboard</Text>,

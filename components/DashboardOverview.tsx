@@ -1,70 +1,49 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { TimeWindow } from "../hooks/useActivityStats";
+import { View, Text, StyleSheet } from "react-native";
 
 interface Props {
-  stats: any;
-  timeWindow: TimeWindow;
-  setTimeWindow: (val: TimeWindow) => void;
+  stats: {
+    count: number;
+    distance: number; // en mètres depuis l'API Strava
+    movingTime: number; // en secondes
+    calories: number;
+  };
 }
 
-export default function DashboardOverview({
-  stats,
-  timeWindow,
-  setTimeWindow,
-}: Props) {
-  const windows: { label: string; value: TimeWindow }[] = [
-    { label: "7J", value: 7 },
-    { label: "30J", value: 30 },
-    { label: "90J", value: 90 },
-    { label: "Tout", value: 0 },
-  ];
+export default function DashboardOverview({ stats }: Props) {
+  // Conversions
+  const distanceKm = (stats.distance / 1000).toFixed(1);
+  const kcal = Math.round(stats.calories);
+  const formatTime = (seconds: number) => {
+    if (!seconds) return "0m";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}m`;
+  };
 
   return (
     <View style={styles.container}>
-      {/* Filtres de temps */}
-      <View style={styles.filterRow}>
-        {windows.map((win) => (
-          <TouchableOpacity
-            key={win.label}
-            onPress={() => setTimeWindow(win.value)}
-            style={[styles.btn, timeWindow === win.value && styles.btnActive]}
-          >
-            <Text
-              style={[
-                styles.btnText,
-                timeWindow === win.value && styles.btnTextActive,
-              ]}
-            >
-              {win.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Stats globales */}
-      <Text style={styles.sectionTitle}>Bilan Cumulé</Text>
+      <Text style={styles.sectionTitle}>Bilan de la période</Text>
+      
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>🔥 {stats.totalKcal}</Text>
-          <Text style={styles.statLabel}>Kcal Totales</Text>
+          <Text style={styles.statValue}>🔥 {kcal}</Text>
+          <Text style={styles.statLabel}>Kcal</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>🚲 {stats.totalDistance}</Text>
+          <Text style={styles.statValue}>🚲 {distanceKm}</Text>
           <Text style={styles.statLabel}>Km Parcourus</Text>
         </View>
       </View>
 
-      {/* Stats hebdomadaires moyennes */}
-      <Text style={styles.sectionTitle}>Rythme Hebdomadaire</Text>
-      <View style={styles.statsGrid}>
+      <View style={[styles.statsGrid, { marginTop: 12 }]}>
         <View style={styles.statBoxDark}>
-          <Text style={styles.statValueDark}>🔥 {stats.weeklyKcal}</Text>
-          <Text style={styles.statLabelDark}>Kcal / Semaine</Text>
+          <Text style={styles.statValueDark}>⏱️ {formatTime(stats.movingTime)}</Text>
+          <Text style={styles.statLabelDark}>Temps d'activité</Text>
         </View>
         <View style={styles.statBoxDark}>
-          <Text style={styles.statValueDark}>📈 {stats.weeklyDistance}</Text>
-          <Text style={styles.statLabelDark}>Km / Semaine</Text>
+          <Text style={styles.statValueDark}>📍 {stats.count}</Text>
+          <Text style={styles.statLabelDark}>Trajets</Text>
         </View>
       </View>
     </View>
@@ -77,28 +56,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#6b7280",
-    marginTop: 20,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 12,
     textTransform: "uppercase",
   },
-  filterRow: {
-    flexDirection: "row",
-    backgroundColor: "#e5e7eb",
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: 10,
-  },
-  btn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 6 },
-  btnActive: {
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  btnText: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
-  btnTextActive: { color: "#fc4c02" },
   statsGrid: { flexDirection: "row", gap: 12 },
   statBox: {
     flex: 1,

@@ -1,65 +1,38 @@
-import { useState, useMemo } from "react";
-import { StravaActivity } from "../types/strava";
+// hooks/useActivityStats.ts
+import { useState, useMemo } from 'react';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
-export type TimeWindow = 7 | 30 | 90 | 0;
-
-export function useActivityStats(activities: StravaActivity[]) {
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>(30);
+export function useActivityStats(activities: any[]) {
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const stats = useMemo(() => {
-    const now = new Date();
+    if (!activities || activities.length === 0) {
+      return { count: 0, distance: 0, movingTime: 0, calories: 0 };
+    }
 
-    const timeFiltered = activities.filter((act) => {
-      if (timeWindow !== 0) {
-        const actDate = new Date(act.start_date);
-        const diffDays =
-          Math.abs(now.getTime() - actDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDays > timeWindow) return false;
-      }
-      return true;
+    const start = viewMode === 'day' 
+      ? startOfDay(selectedDate) 
+      : startOfWeek(selectedDate, { weekStartsOn: 1 });
+    
+    const end = viewMode === 'day' 
+      ? endOfDay(selectedDate) 
+      : endOfWeek(selectedDate, { weekStartsOn: 1 });
+
+    const filteredActivities = activities.filter(act => {
+      
+      if (!act.start_date) return false;
+      const actDate = new Date(act.start_date);
+      return isWithinInterval(actDate, { start, end });
     });
-
-    const count = timeFiltered.length;
-
-    if (count === 0) {
-      return {
-        count: 0,
-        totalKcal: 0,
-        totalDistance: 0,
-        weeklyKcal: 0,
-        weeklyDistance: "0.0",
-        filteredActivities: [],
-      };
-    }
-
-    const totalDistance =
-      timeFiltered.reduce((acc, curr) => acc + curr.distance, 0) / 1000;
-    const totalKcal = timeFiltered.reduce(
-      (acc, curr) => acc + (curr.kilojoules || 0),
-      0,
-    );
-
-    let weeksDivider = timeWindow / 7;
-    if (timeWindow === 0) {
-      const oldestDate = new Date(
-        Math.min(...timeFiltered.map((a) => new Date(a.start_date).getTime())),
-      );
-      const daysSinceOldest = Math.max(
-        1,
-        (now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      weeksDivider = daysSinceOldest / 7;
-    }
-
     return {
-      count,
-      totalKcal: Math.round(totalKcal),
-      totalDistance: totalDistance.toFixed(1),
-      weeklyKcal: Math.round(totalKcal / weeksDivider),
-      weeklyDistance: (totalDistance / weeksDivider).toFixed(1),
-      filteredActivities: timeFiltered,
+      count: filteredActivities.length,
+      distance: filteredActivities.reduce((acc, curr) => acc + (curr.distance || 0), 0),
+      movingTime: filteredActivities.reduce((acc, curr) => acc + (curr.moving_time || 0), 0),
+      // C'est cette ligne qui fait le job. Vérifie que c'est bien "curr.calories" (ou "curr.calorie" au singulier selon ta DB)
+      calories: filteredActivities.reduce((acc, curr) => acc + (curr.calories || 0), 0), 
     };
-  }, [activities, timeWindow]);
+  }, [activities, selectedDate, viewMode]);
 
-  return { timeWindow, setTimeWindow, stats };
+  return { viewMode, setViewMode, selectedDate, setSelectedDate, stats };
 }
