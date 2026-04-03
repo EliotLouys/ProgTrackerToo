@@ -41,3 +41,7 @@ app-example
 # generated native folders
 /ios
 /android
+config.ts
+
+.env
+.env.example

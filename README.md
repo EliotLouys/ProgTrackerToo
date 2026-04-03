@@ -10,7 +10,17 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Configure environment variables (web + mobile)
+
+   ```bash
+   EXPO_PUBLIC_API_BASE_URL=http://localhost:3000/api
+   EXPO_PUBLIC_STRAVA_REDIRECT_URI=velotafdashboard://oauth
+   ```
+
+   On a physical phone, prefer your machine LAN IP (example:
+   `http://192.168.1.155:3000/api`) instead of `localhost`.
+
+3. Start the app
 
    ```bash
    npx expo start
