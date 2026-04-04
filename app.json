@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "VelotafDashboard",
-    "slug": "velotaf-dashboard",
+    "slug": "progtracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -45,6 +45,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "84bcbaee-2505-4292-8ec3-ff71b418c631"
+      }
+    },
+    "owner": "eliotdevynovlole"
   }
 }
