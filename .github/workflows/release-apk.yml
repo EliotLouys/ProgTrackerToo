@@ -54,6 +54,9 @@ jobs:
 
       - name: Build APK locally on GitHub Actions
         # Notice we are using the new 'release-apk' profile
+        env:
+          EXPO_PUBLIC_API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          EXPO_PUBLIC_STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
         run: |
           eas build --platform android --profile release-apk --local --output ./progtracker-${{ env.VERSION }}.apk
 

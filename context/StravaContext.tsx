@@ -9,7 +9,6 @@ import React, {
 import { Alert, Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { OAUTH_CONFIG } from "../config";
 import {
   clearApiToken,
   fetchBackendStravaAuthUrl,
@@ -39,8 +38,8 @@ interface StravaContextType {
 const StravaContext = createContext<StravaContextType | undefined>(undefined);
 
 const resolveRedirectUri = () => {
-  if (OAUTH_CONFIG.STRAVA_REDIRECT_URI) {
-    return OAUTH_CONFIG.STRAVA_REDIRECT_URI;
+  if (process.env.EXPO_PUBLIC_STRAVA_REDIRECT_URI) {
+    return process.env.EXPO_PUBLIC_STRAVA_REDIRECT_URI;
   }
 
   if (Platform.OS === "web") {
