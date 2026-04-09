@@ -14,7 +14,7 @@ export default function SportFilterTabs({
   const filters: { label: string; value: SportFilterType }[] = [
     { label: "Vélo", value: "Ride" },
     { label: "Course", value: "Run" },
-    { label: "Marche", value: "Walk" },
+    { label: "Divers", value: "Workout" },
     { label: "Tout", value: "all" },
   ];
 

@@ -20,7 +20,7 @@ import { StravaActivity } from "../types/strava";
 
 WebBrowser.maybeCompleteAuthSession();
 
-export type SportFilterType = "all" | "Ride" | "Run" | "Walk";
+export type SportFilterType = "all" | "Ride" | "Run" | "Walk" | "Workout";
 
 interface StravaContextType {
   activities: StravaActivity[];
@@ -146,6 +146,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
   // Recalcul automatique dès que l'API répond ou que l'utilisateur change de sport
   const filteredActivities = useMemo(() => {
     if (sportFilter === "all") return activities;
+    
     if (sportFilter === "Ride") {
       return activities.filter(
         (act) =>
@@ -154,6 +155,16 @@ export function StravaProvider({ children }: { children: ReactNode }) {
           act.type === "VirtualRide",
       );
     }
+
+    if (sportFilter === "Workout") {
+      return activities.filter(
+        (act) =>
+          act.type === "Workout" ||
+          act.type === "WeightTraining" ||
+          act.type === "Crossfit",
+      );
+    }
+
     return activities.filter((act) => act.type === sportFilter);
   }, [activities, sportFilter]);
 

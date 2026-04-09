@@ -19,7 +19,21 @@ export default function TabLayout() {
           name="history"
           options={{
             title: "Trajets",
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>Trajets</Text>,
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>🚲</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="meals"
+          options={{
+            title: "Repas",
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>🍱</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Profil",
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text>,
           }}
         />
       </Tabs>
