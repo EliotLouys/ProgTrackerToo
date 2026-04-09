@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { searchCiqual, fetchOFFProduct, logMeal } from "../services/nutrition";
 
 interface Props {
@@ -27,6 +28,8 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [quantity, setQuantity] = useState("100");
+  const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const handleSearch = async (text: string) => {
     setQuery(text);
@@ -51,6 +54,33 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
     }
   };
 
+  const onBarcodeScanned = async ({ data }: { data: string }) => {
+    if (!scanning) return;
+    setScanning(false);
+    setQuery(data);
+    setLoading(true);
+    try {
+      const product = await fetchOFFProduct(data);
+      if (product) {
+        const item = { ...product, source: "OPEN_FOOD_FACTS", externalId: data };
+        setResults([item]);
+        setSelectedItem(item);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startScanning = async () => {
+    if (!permission?.granted) {
+      const { granted } = await requestPermission();
+      if (!granted) return;
+    }
+    setScanning(true);
+  };
+
   const handleLog = async () => {
     if (!selectedItem) return;
     try {
@@ -61,7 +91,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         source: selectedItem.source,
         externalId: selectedItem.externalId,
         mealType,
-        consumedAt: date, // On utilise la date sélectionnée dans le journal !
+        consumedAt: date,
       });
       setQuery("");
       setResults([]);
@@ -82,20 +112,44 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>Ajouter un aliment</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={() => { setScanning(false); onClose(); }}>
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
 
           {!selectedItem ? (
             <>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Rechercher (ex: Pomme, Riz ou Code-barres)"
-                value={query}
-                onChangeText={handleSearch}
-                autoFocus
-              />
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher (ex: Pomme, Riz...)"
+                  value={query}
+                  onChangeText={handleSearch}
+                  autoFocus={!scanning}
+                />
+                <TouchableOpacity style={styles.scanBtn} onPress={startScanning}>
+                  <Text style={styles.scanBtnIcon}>📷</Text>
+                </TouchableOpacity>
+              </View>
+
+              {scanning && (
+                <View style={styles.cameraWrapper}>
+                  <CameraView
+                    style={styles.camera}
+                    onBarcodeScanned={onBarcodeScanned}
+                    barcodeScannerSettings={{
+                      barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"],
+                    }}
+                  />
+                  <TouchableOpacity 
+                    style={styles.cancelScanBtn} 
+                    onPress={() => setScanning(false)}
+                  >
+                    <Text style={styles.cancelScanText}>ANNULER</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {loading ? (
                 <ActivityIndicator style={{ marginTop: 20 }} color="#fc4c02" />
               ) : (
@@ -112,7 +166,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
                     </TouchableOpacity>
                   )}
                   ListEmptyComponent={
-                    query.length >= 3 ? <Text style={styles.emptyText}>Aucun résultat</Text> : null
+                    query.length >= 3 && !scanning ? <Text style={styles.emptyText}>Aucun résultat</Text> : null
                   }
                 />
               )}
@@ -170,13 +224,40 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
   title: { fontSize: 20, fontWeight: "800", color: "#111827" },
   closeBtn: { fontSize: 24, color: "#9ca3af" },
+  searchContainer: { flexDirection: "row", gap: 10, marginBottom: 16 },
   searchInput: {
     backgroundColor: "#f3f4f6",
     padding: 16,
     borderRadius: 12,
     fontSize: 16,
-    marginBottom: 16,
+    flex: 1,
   },
+  scanBtn: {
+    backgroundColor: "#fc4c02",
+    width: 56,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scanBtnIcon: { fontSize: 24 },
+  cameraWrapper: {
+    height: 250,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 16,
+    backgroundColor: "#000",
+  },
+  camera: { flex: 1 },
+  cancelScanBtn: {
+    position: "absolute",
+    bottom: 10,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  cancelScanText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   resultItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,

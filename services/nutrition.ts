@@ -65,13 +65,12 @@ export const logMeal = async (meal: {
 export const fetchMeals = async (date?: Date): Promise<MealLog[]> => {
   if (!date) return request<MealLog[]>("/meals");
   
-  // Format local YYYY-MM-DD manuellement pour éviter le décalage UTC de toISOString()
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
   
-  return request<MealLog[]>(`/meals?date=${dateStr}`);
+  return request<MealLog[]>(`/meals?startDate=${start.toISOString()}&endDate=${end.toISOString()}`);
 };
 
 export const backfillStrava = async (): Promise<any> => {
@@ -85,11 +84,7 @@ export const deleteMeal = async (id: string): Promise<void> => {
 export const fetchDashboardStats = async (startDate: Date, endDate: Date, sport?: string): Promise<any> => {
   const sportQuery = sport ? `&sport=${sport}` : "";
   
-  const formatDate = (d: Date) => {
-    return d.toISOString(); // Le back gère l'ISO pour les ranges
-  };
-
-  return request<any>(`/dashboard?startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}${sportQuery}`);
+  return request<any>(`/dashboard?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}${sportQuery}`);
 };
 
 export interface UserProfile {
