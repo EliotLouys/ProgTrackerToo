@@ -23,7 +23,17 @@ const request = async <T>(path: string, method = "GET", body?: any): Promise<T> 
 };
 
 export interface CiqualItem {
-  id: number;
+  id: number | string;
+  name: string;
+  kcalPer100g: number;
+  proteins?: number;
+  carbs?: number;
+  fats?: number;
+  source?: "CIQUAL" | "USER_FOOD" | "OPEN_FOOD_FACTS";
+}
+
+export interface CustomFood {
+  id: string;
   name: string;
   kcalPer100g: number;
   proteins?: number;
@@ -34,7 +44,7 @@ export interface CiqualItem {
 export interface MealLog {
   id: string;
   name: string;
-  source: "OPEN_FOOD_FACTS" | "CIQUAL" | "CUSTOM";
+  source: "OPEN_FOOD_FACTS" | "CIQUAL" | "CUSTOM" | "USER_FOOD";
   externalId?: string;
   mealType: "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
   quantityGrams: number;
@@ -42,7 +52,7 @@ export interface MealLog {
   consumedAt: string;
 }
 
-export const searchCiqual = async (query: string): Promise<CiqualItem[]> => {
+export const searchFood = async (query: string): Promise<CiqualItem[]> => {
   return request<CiqualItem[]>(`/food/search?q=${encodeURIComponent(query)}`);
 };
 
@@ -73,6 +83,18 @@ export const fetchMeals = async (date?: Date): Promise<MealLog[]> => {
   return request<MealLog[]>(`/meals?startDate=${start.toISOString()}&endDate=${end.toISOString()}`);
 };
 
+export const listCustomFoods = async (): Promise<CustomFood[]> => {
+  return request<CustomFood[]>("/food/custom");
+};
+
+export const createCustomFood = async (food: Omit<CustomFood, "id">): Promise<CustomFood> => {
+  return request<CustomFood>("/food/custom", "POST", food);
+};
+
+export const deleteCustomFood = async (id: string): Promise<void> => {
+  return request<void>(`/food/custom/${id}`, "DELETE");
+};
+
 export const backfillStrava = async (): Promise<any> => {
   return request<any>("/strava/backfill", "POST");
 };
@@ -81,10 +103,11 @@ export const deleteMeal = async (id: string): Promise<void> => {
   return request<void>(`/meals/${id}`, "DELETE");
 };
 
-export const fetchDashboardStats = async (startDate: Date, endDate: Date, sport?: string): Promise<any> => {
+export const fetchDashboardStats = async (startDate: Date, endDate: Date, sport?: string, excludeFuture?: boolean): Promise<any> => {
   const sportQuery = sport ? `&sport=${sport}` : "";
+  const excludeFutureQuery = excludeFuture ? `&excludeFuture=true` : "";
   
-  return request<any>(`/dashboard?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}${sportQuery}`);
+  return request<any>(`/dashboard?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}${sportQuery}${excludeFutureQuery}`);
 };
 
 export interface UserProfile {

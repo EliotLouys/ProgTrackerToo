@@ -30,6 +30,13 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="foods"
+          options={{
+            title: "Mes Aliments",
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>🥗</Text>,
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: "Profil",

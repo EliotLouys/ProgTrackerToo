@@ -10,9 +10,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { searchCiqual, fetchOFFProduct, logMeal } from "../services/nutrition";
+import { searchFood, fetchOFFProduct, logMeal, createCustomFood } from "../services/nutrition";
 
 interface Props {
   visible: boolean;
@@ -28,6 +29,13 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [quantity, setQuantity] = useState("100");
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customKcal, setCustomKcal] = useState("");
+  const [customProteins, setCustomProteins] = useState("");
+  const [customCarbs, setCustomCarbs] = useState("");
+  const [customFats, setCustomFats] = useState("");
+  const [saveForFuture, setSaveForFuture] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -44,8 +52,8 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         const product = await fetchOFFProduct(text);
         setResults(product ? [{ ...product, source: "OPEN_FOOD_FACTS", externalId: text }] : []);
       } else {
-        const items = await searchCiqual(text);
-        setResults(items.map(i => ({ ...i, source: "CIQUAL", externalId: i.id })));
+        const items = await searchFood(text);
+        setResults(items.map(i => ({ ...i, externalId: i.id })));
       }
     } catch (err) {
       console.error(err);
@@ -82,25 +90,64 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   };
 
   const handleLog = async () => {
-    if (!selectedItem) return;
     try {
-      await logMeal({
-        name: selectedItem.name,
-        kcalPer100g: selectedItem.kcalPer100g,
-        quantityGrams: parseFloat(quantity) || 0,
-        source: selectedItem.source,
-        externalId: selectedItem.externalId,
-        mealType,
-        consumedAt: date,
-      });
-      setQuery("");
-      setResults([]);
-      setSelectedItem(null);
-      setQuantity("100");
+      if (isCustomMode) {
+        let source = "CUSTOM";
+        let externalId = undefined;
+
+        if (saveForFuture) {
+          const newFood = await createCustomFood({
+            name: customName,
+            kcalPer100g: parseFloat(customKcal) || 0,
+            proteins: parseFloat(customProteins) || 0,
+            carbs: parseFloat(customCarbs) || 0,
+            fats: parseFloat(customFats) || 0,
+          });
+          source = "USER_FOOD";
+          externalId = newFood.id;
+        }
+
+        await logMeal({
+          name: customName,
+          kcalPer100g: parseFloat(customKcal) || 0,
+          quantityGrams: parseFloat(quantity) || 0,
+          source,
+          externalId,
+          mealType,
+          consumedAt: date,
+        });
+      } else {
+        if (!selectedItem) return;
+        await logMeal({
+          name: selectedItem.name,
+          kcalPer100g: selectedItem.kcalPer100g,
+          quantityGrams: parseFloat(quantity) || 0,
+          source: selectedItem.source,
+          externalId: selectedItem.externalId,
+          mealType,
+          consumedAt: date,
+        });
+      }
+      resetForm();
       onLogSuccess();
     } catch (err) {
       console.error("Erreur lors de l'enregistrement du repas:", err);
     }
+  };
+
+  const resetForm = () => {
+    setQuery("");
+    setResults([]);
+    setSelectedItem(null);
+    setQuantity("100");
+    setIsCustomMode(false);
+    setCustomName("");
+    setCustomKcal("");
+    setCustomProteins("");
+    setCustomCarbs("");
+    setCustomFats("");
+    setSaveForFuture(true);
+    setScanning(false);
   };
 
   return (
@@ -112,12 +159,12 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>Ajouter un aliment</Text>
-            <TouchableOpacity onPress={() => { setScanning(false); onClose(); }}>
+            <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          {!selectedItem ? (
+          {!selectedItem && !isCustomMode ? (
             <>
               <View style={styles.searchContainer}>
                 <TextInput
@@ -131,6 +178,13 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
                   <Text style={styles.scanBtnIcon}>📷</Text>
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity 
+                style={styles.customToggleBtn}
+                onPress={() => setIsCustomMode(true)}
+              >
+                <Text style={styles.customToggleText}>+ Ajouter un aliment personnalisé</Text>
+              </TouchableOpacity>
 
               {scanning && (
                 <View style={styles.cameraWrapper}>
@@ -161,20 +215,117 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
                       style={styles.resultItem}
                       onPress={() => setSelectedItem(item)}
                     >
-                      <Text style={styles.resultName}>{item.name}</Text>
+                      <View style={styles.resultHeader}>
+                        <Text style={styles.resultName}>{item.name}</Text>
+                        {item.source && (
+                          <View style={[
+                            styles.sourceBadge, 
+                            { backgroundColor: item.source === 'USER_FOOD' ? '#dcfce7' : '#f3f4f6' }
+                          ]}>
+                            <Text style={[
+                              styles.sourceBadgeText,
+                              { color: item.source === 'USER_FOOD' ? '#166534' : '#6b7280' }
+                            ]}>
+                              {item.source === 'USER_FOOD' ? 'MES ALIMENTS' : item.source === 'CIQUAL' ? 'CIQUAL' : 'OFF'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={styles.resultKcal}>{Math.round(item.kcalPer100g)} kcal / 100g</Text>
                     </TouchableOpacity>
                   )}
                   ListEmptyComponent={
-                    query.length >= 3 && !scanning ? <Text style={styles.emptyText}>Aucun résultat</Text> : null
+                    query.length >= 3 && !scanning ? (
+                      <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>Aucun résultat pour "{query}"</Text>
+                        <TouchableOpacity 
+                          style={styles.emptyCustomBtn}
+                          onPress={() => {
+                            setCustomName(query);
+                            setIsCustomMode(true);
+                          }}
+                        >
+                          <Text style={styles.emptyCustomBtnText}>Créer l'aliment "{query}"</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null
                   }
                 />
               )}
             </>
           ) : (
             <View style={styles.logForm}>
-              <Text style={styles.selectedName}>{selectedItem.name}</Text>
-              <Text style={styles.selectedKcal}>{Math.round(selectedItem.kcalPer100g)} kcal pour 100g</Text>
+              {isCustomMode ? (
+                <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Nom de l'aliment</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="ex: Mon Gâteau Maison"
+                      value={customName}
+                      onChangeText={setCustomName}
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Calories pour 100g</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      keyboardType="numeric"
+                      placeholder="ex: 250"
+                      value={customKcal}
+                      onChangeText={setCustomKcal}
+                    />
+                  </View>
+                  
+                  <View style={styles.macroGrid}>
+                    <View style={styles.macroInputGroup}>
+                      <Text style={styles.macroLabel}>Prot. (g)</Text>
+                      <TextInput
+                        style={styles.macroInput}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        value={customProteins}
+                        onChangeText={setCustomProteins}
+                      />
+                    </View>
+                    <View style={styles.macroInputGroup}>
+                      <Text style={styles.macroLabel}>Gluc. (g)</Text>
+                      <TextInput
+                        style={styles.macroInput}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        value={customCarbs}
+                        onChangeText={setCustomCarbs}
+                      />
+                    </View>
+                    <View style={styles.macroInputGroup}>
+                      <Text style={styles.macroLabel}>Lip. (g)</Text>
+                      <TextInput
+                        style={styles.macroInput}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        value={customFats}
+                        onChangeText={setCustomFats}
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity 
+                    style={styles.checkboxContainer}
+                    onPress={() => setSaveForFuture(!saveForFuture)}
+                  >
+                    <View style={[styles.checkbox, saveForFuture && styles.checkboxSelected]}>
+                      {saveForFuture && <Text style={styles.checkboxIcon}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>Enregistrer dans "Mes Aliments"</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              ) : (
+                <>
+                  <Text style={styles.selectedName}>{selectedItem.name}</Text>
+                  <Text style={styles.selectedKcal}>{Math.round(selectedItem.kcalPer100g)} kcal pour 100g</Text>
+                </>
+              )}
               
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Quantité (en grammes)</Text>
@@ -187,19 +338,23 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
               </View>
 
               <Text style={styles.totalKcal}>
-                Total: {Math.round((selectedItem.kcalPer100g * (parseFloat(quantity) || 0)) / 100)} kcal
+                Total: {Math.round(((isCustomMode ? parseFloat(customKcal) : selectedItem.kcalPer100g) * (parseFloat(quantity) || 0)) / 100)} kcal
               </Text>
 
               <View style={styles.actions}>
                 <TouchableOpacity 
                   style={styles.backBtn}
-                  onPress={() => setSelectedItem(null)}
+                  onPress={() => {
+                    if (isCustomMode) setIsCustomMode(false);
+                    else setSelectedItem(null);
+                  }}
                 >
                   <Text style={styles.backBtnText}>RETOUR</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.confirmBtn}
                   onPress={handleLog}
+                  disabled={isCustomMode && (!customName || !customKcal)}
                 >
                   <Text style={styles.confirmBtnText}>VALIDER</Text>
                 </TouchableOpacity>
@@ -224,7 +379,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
   title: { fontSize: 20, fontWeight: "800", color: "#111827" },
   closeBtn: { fontSize: 24, color: "#9ca3af" },
-  searchContainer: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  searchContainer: { flexDirection: "row", gap: 10, marginBottom: 8 },
   searchInput: {
     backgroundColor: "#f3f4f6",
     padding: 16,
@@ -240,6 +395,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scanBtnIcon: { fontSize: 24 },
+  customToggleBtn: {
+    paddingVertical: 12,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  customToggleText: {
+    color: "#fc4c02",
+    fontWeight: "700",
+    fontSize: 14,
+  },
   cameraWrapper: {
     height: 250,
     borderRadius: 20,
@@ -263,15 +428,53 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  resultName: { fontSize: 16, fontWeight: "500", color: "#374151" },
+  resultHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  resultName: { fontSize: 16, fontWeight: "500", color: "#374151", flex: 1 },
+  sourceBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  sourceBadgeText: { fontSize: 10, fontWeight: "800" },
   resultKcal: { fontSize: 14, color: "#9ca3af" },
-  emptyText: { textAlign: "center", marginTop: 20, color: "#9ca3af", fontStyle: "italic" },
+  emptyContainer: { alignItems: "center", marginTop: 24 },
+  emptyText: { textAlign: "center", color: "#9ca3af", fontStyle: "italic", marginBottom: 16 },
+  emptyCustomBtn: {
+    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  emptyCustomBtnText: {
+    color: "#4b5563",
+    fontWeight: "700",
+  },
   
-  logForm: { paddingVertical: 20 },
+  logForm: { paddingVertical: 10 },
   selectedName: { fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 8 },
   selectedKcal: { fontSize: 16, color: "#6b7280", marginBottom: 24 },
-  inputGroup: { marginBottom: 24 },
+  inputGroup: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: "600", color: "#4b5563", marginBottom: 8 },
+  textInput: {
+    backgroundColor: "#f3f4f6",
+    padding: 16,
+    borderRadius: 12,
+    fontSize: 16,
+  },
+  macroGrid: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  macroInputGroup: { flex: 1 },
+  macroLabel: { fontSize: 12, fontWeight: "600", color: "#6b7280", marginBottom: 4 },
+  macroInput: {
+    backgroundColor: "#f3f4f6",
+    padding: 12,
+    borderRadius: 10,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  checkboxContainer: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  checkbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: "#fc4c02", alignItems: "center", justifyContent: "center" },
+  checkboxSelected: { backgroundColor: "#fc4c02" },
+  checkboxIcon: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  checkboxLabel: { fontSize: 14, color: "#374151", fontWeight: "600" },
+
   quantityInput: {
     backgroundColor: "#f3f4f6",
     padding: 16,
@@ -280,8 +483,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
   },
-  totalKcal: { fontSize: 20, fontWeight: "800", color: "#fc4c02", textAlign: "center", marginBottom: 32 },
-  actions: { flexDirection: "row", gap: 12 },
+  totalKcal: { fontSize: 20, fontWeight: "800", color: "#fc4c02", textAlign: "center", marginBottom: 20, marginTop: 10 },
+  actions: { flexDirection: "row", gap: 12, marginTop: 10 },
   backBtn: { flex: 1, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#d1d5db", alignItems: "center" },
   backBtnText: { fontWeight: "700", color: "#4b5563" },
   confirmBtn: { flex: 2, padding: 16, borderRadius: 12, backgroundColor: "#fc4c02", alignItems: "center" },

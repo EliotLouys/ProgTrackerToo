@@ -46,6 +46,7 @@ export default function DashboardScreen() {
   const [nutritionData, setNutritionData] = useState<any>(null);
   const [nutritionLoading, setNutritionLoading] = useState(false);
   const [showOnlySport, setShowOnlySport] = useState(false);
+  const [excludeFuture, setExcludeFuture] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -67,7 +68,7 @@ export default function DashboardScreen() {
           end = addDays(start, 6);
           end.setHours(23,59,59,999);
         }
-        const data = await fetchDashboardStats(start, end, sportFilter);
+        const data = await fetchDashboardStats(start, end, sportFilter, excludeFuture);
         setNutritionData(data);
       } catch (err) {
         console.error("Failed to load nutrition data", err);
@@ -77,7 +78,7 @@ export default function DashboardScreen() {
     };
 
     loadNutrition();
-  }, [selectedDate, viewMode, isAuthenticated, sportFilter]);
+  }, [selectedDate, viewMode, isAuthenticated, sportFilter, excludeFuture]);
 
 
   const dateLabel = viewMode === 'day' 
@@ -150,14 +151,25 @@ export default function DashboardScreen() {
             <Text style={styles.dateSelectorText}>📅 {dateLabel}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.toggleModeBtn, showOnlySport && styles.toggleModeBtnActive]} 
-            onPress={() => setShowOnlySport(!showOnlySport)}
-          >
-            <Text style={[styles.toggleModeText, showOnlySport && styles.toggleModeTextActive]}>
-              {showOnlySport ? "🔥 Sport" : "🌍 Total"}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.togglesColumn}>
+            <TouchableOpacity 
+              style={[styles.smallToggleBtn, showOnlySport && styles.toggleModeBtnActive]} 
+              onPress={() => setShowOnlySport(!showOnlySport)}
+            >
+              <Text style={[styles.smallToggleText, showOnlySport && styles.toggleModeTextActive]}>
+                {showOnlySport ? "🔥 Sport" : "🌍 Total"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.smallToggleBtn, excludeFuture && styles.toggleModeBtnActive]} 
+              onPress={() => setExcludeFuture(!excludeFuture)}
+            >
+              <Text style={[styles.smallToggleText, excludeFuture && styles.toggleModeTextActive]}>
+                {excludeFuture ? "⌛ Passé" : "📅 Semaine"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
   
         <DashboardOverview 
@@ -253,23 +265,28 @@ const styles = StyleSheet.create({
   },
   dateSelectorText: { fontSize: 14, color: '#374151', fontWeight: '600', textTransform: 'capitalize' },
   
-  toggleModeBtn: {
+  togglesColumn: {
     flex: 1,
+    gap: 8,
+  },
+  smallToggleBtn: {
     backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d1d5db',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleModeBtnActive: {
     backgroundColor: '#111827',
     borderColor: '#111827',
   },
-  toggleModeText: {
+  smallToggleText: {
     color: '#4b5563',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 11,
   },
   toggleModeTextActive: {
     color: '#fff',
