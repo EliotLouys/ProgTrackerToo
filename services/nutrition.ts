@@ -29,12 +29,30 @@ export interface CiqualItem {
   proteins?: number;
   carbs?: number;
   fats?: number;
-  source?: "CIQUAL" | "USER_FOOD" | "OPEN_FOOD_FACTS";
+  source?: "CIQUAL" | "USER_FOOD" | "OPEN_FOOD_FACTS" | "RECIPE";
+  ingredients?: RecipeIngredient[];
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  kcalPer100g: number;
+  ingredients: RecipeIngredient[];
+}
+
+export interface RecipeIngredient {
+  name: string;
+  kcalPer100g: number;
+  proteins?: number;
+  carbs?: number;
+  fats?: number;
+  quantityGrams: number;
 }
 
 export interface CustomFood {
   id: string;
   name: string;
+  barcode?: string;
   kcalPer100g: number;
   proteins?: number;
   carbs?: number;
@@ -44,7 +62,7 @@ export interface CustomFood {
 export interface MealLog {
   id: string;
   name: string;
-  source: "OPEN_FOOD_FACTS" | "CIQUAL" | "CUSTOM" | "USER_FOOD";
+  source: "OPEN_FOOD_FACTS" | "CIQUAL" | "CUSTOM" | "USER_FOOD" | "RECIPE";
   externalId?: string;
   mealType: "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
   quantityGrams: number;
@@ -52,8 +70,20 @@ export interface MealLog {
   consumedAt: string;
 }
 
-export const searchFood = async (query: string): Promise<CiqualItem[]> => {
-  return request<CiqualItem[]>(`/food/search?q=${encodeURIComponent(query)}`);
+export const searchFood = async (query: string, recipes = false): Promise<CiqualItem[]> => {
+  return request<CiqualItem[]>(`/food/search?q=${encodeURIComponent(query)}&recipes=${recipes}`);
+};
+
+export const listRecipes = async (): Promise<Recipe[]> => {
+  return request<Recipe[]>("/recipes");
+};
+
+export const createRecipe = async (recipe: { name: string; ingredients: RecipeIngredient[] }): Promise<Recipe> => {
+  return request<Recipe>("/recipes", "POST", recipe);
+};
+
+export const deleteRecipe = async (id: string): Promise<void> => {
+  return request<void>(`/recipes/${id}`, "DELETE");
 };
 
 export const fetchOFFProduct = async (barcode: string): Promise<any> => {

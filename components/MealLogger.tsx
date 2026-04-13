@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { searchFood, fetchOFFProduct, logMeal, createCustomFood } from "../services/nutrition";
+import RecipeCreator from "./RecipeCreator";
 
 interface Props {
   visible: boolean;
@@ -30,6 +31,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [quantity, setQuantity] = useState("100");
+  const [isRecipeSearch, setIsRecipeSearch] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customKcal, setCustomKcal] = useState("");
@@ -38,10 +40,20 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [customFats, setCustomFats] = useState("");
   const [saveForFuture, setSaveForFuture] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [isRecipeCreatorVisible, setIsRecipeCreatorVisible] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
   const scanAnim = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const handleEmptyStatePress = () => {
+    if (isRecipeSearch) {
+      setIsRecipeCreatorVisible(true);
+    } else {
+      setCustomName(query);
+      setIsCustomMode(true);
+    }
+  };
 
   useEffect(() => {
     if (scanning) {
@@ -59,20 +71,16 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
     return () => { if (loopRef.current) loopRef.current.stop(); };
   }, [scanning]);
 
-  const handleSearch = async (text: string) => {
-    setQuery(text);
-    if (text.length < 3) {
-      setResults([]);
-      return;
-    }
+  const performSearch = async () => {
+    if (query.trim().length < 3) return;
     setLoading(true);
     try {
-      if (/^\d{8,13}$/.test(text)) {
-        const product = await fetchOFFProduct(text);
-        setResults(product ? [{ ...product, source: "OPEN_FOOD_FACTS", externalId: text }] : []);
+      if (!isRecipeSearch && /^\d{8,13}$/.test(query)) {
+        const product = await fetchOFFProduct(query);
+        setResults(product ? [{ ...product, source: "USER_FOOD", externalId: query }] : []);
       } else {
-        const items = await searchFood(text);
-        setResults(items.map(i => ({ ...i, externalId: i.id })));
+        const items = await searchFood(query, isRecipeSearch);
+        setResults(items.map(i => ({ ...i, externalId: (i as any).id || (i as any).externalId })));
       }
     } catch (err) {
       console.error(err);
@@ -89,7 +97,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
     try {
       const product = await fetchOFFProduct(data);
       if (product) {
-        const item = { ...product, source: "OPEN_FOOD_FACTS", externalId: data };
+        const item = { ...product, source: "USER_FOOD", externalId: data }; // Saved in shadow db now
         setResults([item]);
         setSelectedItem(item);
       }
@@ -125,7 +133,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         await logMeal({
           name: selectedItem.name, kcalPer100g: selectedItem.kcalPer100g,
           quantityGrams: parseFloat(quantity) || 0, source: selectedItem.source,
-          externalId: selectedItem.externalId, mealType, consumedAt: date,
+          externalId: String(selectedItem.externalId || ""), mealType, consumedAt: date,
         });
       }
       resetForm();
@@ -137,6 +145,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
 
   const resetForm = () => {
     setQuery(""); setResults([]); setSelectedItem(null); setQuantity("100");
+    setIsRecipeSearch(false);
     setIsCustomMode(false); setCustomName(""); setCustomKcal("");
     setCustomProteins(""); setCustomCarbs(""); setCustomFats("");
     setSaveForFuture(true); setScanning(false);
@@ -165,22 +174,44 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
         >
           {!selectedItem && !isCustomMode ? (
             <>
-              <View style={styles.searchRow}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Rechercher (ex: Pomme, Riz...)"
-                  value={query}
-                  onChangeText={handleSearch}
-                />
-                <TouchableOpacity style={styles.scanBtn} onPress={async () => {
-                  if (!permission?.granted) await requestPermission();
-                  setScanning(true);
-                }}>
-                  <Text style={styles.scanBtnIcon}>📷</Text>
+              <View style={styles.tabRow}>
+                <TouchableOpacity 
+                  style={[styles.tab, !isRecipeSearch && styles.tabActive]} 
+                  onPress={() => { setIsRecipeSearch(false); setResults([]); setQuery(""); }}
+                >
+                  <Text style={[styles.tabText, !isRecipeSearch && styles.tabTextActive]}>Aliments</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tab, isRecipeSearch && styles.tabActive]} 
+                  onPress={() => { setIsRecipeSearch(true); setResults([]); setQuery(""); }}
+                >
+                  <Text style={[styles.tabText, isRecipeSearch && styles.tabTextActive]}>Recettes</Text>
                 </TouchableOpacity>
               </View>
 
-              {!scanning && (
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={isRecipeSearch ? "Rechercher une recette..." : "Rechercher (ex: Pomme, Riz...)"}
+                  value={query}
+                  onChangeText={setQuery}
+                  onSubmitEditing={performSearch}
+                  returnKeyType="search"
+                />
+                <TouchableOpacity style={styles.searchBtn} onPress={performSearch}>
+                  <Text style={styles.searchBtnIcon}>🔍</Text>
+                </TouchableOpacity>
+                {!isRecipeSearch && (
+                  <TouchableOpacity style={styles.scanBtn} onPress={async () => {
+                    if (!permission?.granted) await requestPermission();
+                    setScanning(true);
+                  }}>
+                    <Text style={styles.scanBtnIcon}>📷</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {!scanning && !isRecipeSearch && (
                 <TouchableOpacity style={styles.customToggleBtn} onPress={() => setIsCustomMode(true)}>
                   <Text style={styles.customToggleText}>+ Ajouter un aliment personnalisé</Text>
                 </TouchableOpacity>
@@ -217,9 +248,15 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
                     <View style={styles.resultHeader}>
                       <Text style={styles.resultName}>{item.name}</Text>
                       {item.source && (
-                        <View style={[styles.sourceBadge, { backgroundColor: item.source === 'USER_FOOD' ? '#dcfce7' : '#f3f4f6' }]}>
-                          <Text style={[styles.sourceBadgeText, { color: item.source === 'USER_FOOD' ? '#166534' : '#6b7280' }]}>
-                            {item.source === 'USER_FOOD' ? 'MES ALIMENTS' : item.source === 'CIQUAL' ? 'CIQUAL' : 'OFF'}
+                        <View style={[
+                          styles.sourceBadge, 
+                          { backgroundColor: item.source === 'USER_FOOD' ? '#dcfce7' : item.source === 'RECIPE' ? '#e0f2fe' : '#f3f4f6' }
+                        ]}>
+                          <Text style={[
+                            styles.sourceBadgeText, 
+                            { color: item.source === 'USER_FOOD' ? '#166534' : item.source === 'RECIPE' ? '#0369a1' : '#6b7280' }
+                          ]}>
+                            {item.source === 'USER_FOOD' ? 'MES ALIMENTS' : item.source === 'RECIPE' ? 'RECETTE' : item.source === 'CIQUAL' ? 'CIQUAL' : 'OFF'}
                           </Text>
                         </View>
                       )}
@@ -232,8 +269,10 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
               {query.length >= 3 && results.length === 0 && !loading && !scanning && (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>Aucun résultat pour "{query}"</Text>
-                  <TouchableOpacity style={styles.emptyCustomBtn} onPress={() => { setCustomName(query); setIsCustomMode(true); }}>
-                    <Text style={styles.emptyCustomBtnText}>Créer l'aliment "{query}"</Text>
+                  <TouchableOpacity style={styles.emptyCustomBtn} onPress={handleEmptyStatePress}>
+                    <Text style={styles.emptyCustomBtnText}>
+                      {isRecipeSearch ? `Créer la recette "${query}"` : `Ajouter "${query}" manuellement`}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -287,6 +326,15 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
             </View>
           )}
         </ScrollView>
+
+        <RecipeCreator 
+          visible={isRecipeCreatorVisible}
+          onClose={() => setIsRecipeCreatorVisible(false)}
+          onSuccess={() => {
+            setIsRecipeCreatorVisible(false);
+            performSearch(); // Refresh results to find the new recipe
+          }}
+        />
       </View>
     </Modal>
   );
@@ -303,6 +351,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, backgroundColor: "#f3f4f6", padding: 16, borderRadius: 12, fontSize: 16 },
   scanBtn: { backgroundColor: "#fc4c02", width: 56, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   scanBtnIcon: { fontSize: 24 },
+  searchBtn: { backgroundColor: "#111827", width: 56, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  searchBtnIcon: { fontSize: 20 },
   customToggleBtn: { paddingVertical: 15, alignItems: "center" },
   customToggleText: { color: "#fc4c02", fontWeight: "700", fontSize: 14 },
   cameraWrapper: { height: 350, borderRadius: 24, overflow: "hidden", backgroundColor: "#000", marginBottom: 20 },
@@ -349,5 +399,10 @@ const styles = StyleSheet.create({
   backBtnText: { fontWeight: "700", color: "#4b5563" },
   validBtn: { flex: 2, padding: 18, borderRadius: 15, backgroundColor: "#fc4c02", alignItems: "center" },
   validBtnText: { color: "#fff", fontWeight: "700" },
-  inputGroup: { marginBottom: 20 }
+  inputGroup: { marginBottom: 20 },
+  tabRow: { flexDirection: "row", backgroundColor: "#f3f4f6", borderRadius: 12, padding: 4, marginBottom: 15 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10 },
+  tabActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: "600", color: "#6b7280" },
+  tabTextActive: { color: "#fc4c02" },
 });
