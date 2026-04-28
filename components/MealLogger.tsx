@@ -72,7 +72,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   }, [scanning]);
 
   const performSearch = async () => {
-    if (query.trim().length < 3) return;
+    if (query.trim().length < 3 || loading) return;
     setLoading(true);
     try {
       if (!isRecipeSearch && /^\d{8,13}$/.test(query)) {

@@ -29,7 +29,7 @@ export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
   const [ingredientQty, setIngredientQty] = useState("100");
 
   const performSearch = async () => {
-    if (query.trim().length < 3) return;
+    if (query.trim().length < 3 || loading) return;
     setLoading(true);
     try {
       const items = await searchFood(query, false);
