@@ -3,7 +3,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { StravaActivity } from "../types/strava";
 
-const API_TOKEN_KEY = "@api_token";
+const API_TOKEN_KEY = "api_token";
 
 type ApiErrorPayload = { error?: string };
 
