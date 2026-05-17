@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { listCustomFoods, deleteCustomFood, CustomFood, listRecipes, deleteRecipe, Recipe } from "../../services/nutrition";
 import RecipeCreator from "../../components/RecipeCreator";
 import FoodCreator from "../../components/FoodCreator";
@@ -19,6 +20,9 @@ export default function FoodsScreen() {
   const [activeTab, setActiveTab] = useState<"foods" | "recipes">("foods");
   const [isCreatorVisible, setIsCreatorVisible] = useState(false);
   const [isFoodCreatorVisible, setIsFoodCreatorVisible] = useState(false);
+
+  const [selectedFood, setSelectedFood] = useState<CustomFood | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -87,136 +91,149 @@ export default function FoodsScreen() {
 
   if (loading && !isCreatorVisible && !isFoodCreatorVisible) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.centerSafeArea}>
         <ActivityIndicator size="large" color="#fc4c02" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Ma Cuisine</Text>
-        <TouchableOpacity 
-          style={styles.addBtn} 
-          onPress={() => activeTab === "recipes" ? setIsCreatorVisible(true) : setIsFoodCreatorVisible(true)}
-        >
-          <Text style={styles.addBtnText}>+ Créer</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.tabRow}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === "foods" && styles.tabActive]} 
-          onPress={() => setActiveTab("foods")}
-        >
-          <Text style={[styles.tabText, activeTab === "foods" && styles.tabTextActive]}>Aliments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === "recipes" && styles.tabActive]} 
-          onPress={() => setActiveTab("recipes")}
-        >
-          <Text style={[styles.tabText, activeTab === "recipes" && styles.tabTextActive]}>Recettes</Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === "foods" ? (
-        <View style={{ flex: 1 }}>
-          <FlatList
-            data={foods}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.foodCard}>
-                <View style={styles.foodInfo}>
-                  <Text style={styles.foodName}>{item.name}</Text>
-                  <Text style={styles.foodKcal}>{Math.round(item.kcalPer100g)} kcal / 100g</Text>
-                  {(item.proteins || item.carbs || item.fats) ? (
-                    <View style={styles.macroRow}>
-                      <Text style={styles.macroText}>P: {item.proteins || 0}g</Text>
-                      <Text style={styles.macroText}>G: {item.carbs || 0}g</Text>
-                      <Text style={styles.macroText}>L: {item.fats || 0}g</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <TouchableOpacity 
-                  style={styles.deleteBtn}
-                  onPress={() => handleDeleteFood(item.id, item.name)}
-                >
-                  <Text style={styles.deleteIcon}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Vous n'avez pas encore d'aliments personnalisés.</Text>
-                <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setIsFoodCreatorVisible(true)}>
-                  <Text style={styles.emptyAddBtnText}>Créer mon premier aliment</Text>
-                </TouchableOpacity>
-              </View>
-            }
-            refreshing={loading}
-            onRefresh={loadData}
-          />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Ma Cuisine</Text>
+          <TouchableOpacity 
+            style={styles.addBtn} 
+            onPress={() => {
+              setSelectedFood(null);
+              setSelectedRecipe(null);
+              if (activeTab === "recipes") setIsCreatorVisible(true);
+              else setIsFoodCreatorVisible(true);
+            }}
+          >
+            <Text style={styles.addBtnText}>+ Créer</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={{ flex: 1 }}>
-          <FlatList
-            data={recipes}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.foodCard}>
-                <View style={styles.foodInfo}>
-                  <Text style={styles.foodName}>{item.name}</Text>
-                  <Text style={styles.foodKcal}>{Math.round(item.kcalPer100g)} kcal / 100g (moyenne)</Text>
-                  <Text style={styles.ingredientsCount}>{item.ingredients.length} ingrédients</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.deleteBtn}
-                  onPress={() => handleDeleteRecipe(item.id, item.name)}
-                >
-                  <Text style={styles.deleteIcon}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Vous n'avez pas encore de recettes.</Text>
-                <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setIsCreatorVisible(true)}>
-                  <Text style={styles.emptyAddBtnText}>Créer ma première recette</Text>
-                </TouchableOpacity>
-              </View>
-            }
-            refreshing={loading}
-            onRefresh={loadData}
-          />
+        
+        <View style={styles.tabRow}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === "foods" && styles.tabActive]} 
+            onPress={() => setActiveTab("foods")}
+          >
+            <Text style={[styles.tabText, activeTab === "foods" && styles.tabTextActive]}>Aliments</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === "recipes" && styles.tabActive]} 
+            onPress={() => setActiveTab("recipes")}
+          >
+            <Text style={[styles.tabText, activeTab === "recipes" && styles.tabTextActive]}>Recettes</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <RecipeCreator 
-        visible={isCreatorVisible} 
-        onClose={() => setIsCreatorVisible(false)} 
-        onSuccess={() => {
-          setIsCreatorVisible(false);
-          loadData();
-        }}
-      />
+        {activeTab === "foods" ? (
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={foods}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.foodCard} onPress={() => { setSelectedFood(item); setIsFoodCreatorVisible(true); }}>
+                  <View style={styles.foodInfo}>
+                    <Text style={styles.foodName}>{item.name}</Text>
+                    <Text style={styles.foodKcal}>{Math.round(item.kcalPer100g)} kcal / 100g</Text>
+                    {(item.proteins || item.carbs || item.fats) ? (
+                      <View style={styles.macroRow}>
+                        <Text style={styles.macroText}>P: {item.proteins || 0}g</Text>
+                        <Text style={styles.macroText}>G: {item.carbs || 0}g</Text>
+                        <Text style={styles.macroText}>L: {item.fats || 0}g</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteFood(item.id, item.name)}
+                  >
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Vous n'avez pas encore d'aliments personnalisés.</Text>
+                  <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setIsFoodCreatorVisible(true)}>
+                    <Text style={styles.emptyAddBtnText}>Créer mon premier aliment</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+              refreshing={loading}
+              onRefresh={loadData}
+            />
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={recipes}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.foodCard} onPress={() => { setSelectedRecipe(item); setIsCreatorVisible(true); }}>
+                  <View style={styles.foodInfo}>
+                    <Text style={styles.foodName}>{item.name}</Text>
+                    <Text style={styles.foodKcal}>{Math.round(item.kcalPer100g)} kcal / 100g (moyenne)</Text>
+                    <Text style={styles.ingredientsCount}>{item.ingredients.length} ingrédients</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteRecipe(item.id, item.name)}
+                  >
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Vous n'avez pas encore de recettes.</Text>
+                  <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setIsCreatorVisible(true)}>
+                    <Text style={styles.emptyAddBtnText}>Créer ma première recette</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+              refreshing={loading}
+              onRefresh={loadData}
+            />
+          </View>
+        )}
 
-      <FoodCreator
-        visible={isFoodCreatorVisible}
-        onClose={() => setIsFoodCreatorVisible(false)}
-        onSuccess={() => {
-          setIsFoodCreatorVisible(false);
-          loadData();
-        }}
-      />
-    </View>
+        <RecipeCreator 
+          visible={isCreatorVisible} 
+          initialRecipe={selectedRecipe}
+          onClose={() => { setIsCreatorVisible(false); setSelectedRecipe(null); }} 
+          onSuccess={() => {
+            setIsCreatorVisible(false);
+            setSelectedRecipe(null);
+            loadData();
+          }}
+        />
+
+        <FoodCreator
+          visible={isFoodCreatorVisible}
+          initialFood={selectedFood}
+          onClose={() => { setIsFoodCreatorVisible(false); setSelectedFood(null); }}
+          onSuccess={() => {
+            setIsFoodCreatorVisible(false);
+            setSelectedFood(null);
+            loadData();
+          }}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6", padding: 20 },
+  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
+  centerSafeArea: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f3f4f6" },
+  container: { flex: 1, padding: 20 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 40, marginBottom: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8, marginBottom: 8 },
   title: { fontSize: 26, fontWeight: "900", color: "#111827" },
   addBtn: { backgroundColor: "#fc4c02", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },

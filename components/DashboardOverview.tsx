@@ -19,6 +19,14 @@ interface Props {
     naturalBurned?: number;
     consumed: number;
     dailyStats?: DailyStat[];
+    consumedProteins?: number;
+    consumedCarbs?: number;
+    consumedFats?: number;
+    goals?: {
+      proteins: number;
+      carbs: number;
+      fats: number;
+    };
   };
   showOnlySport: boolean; // Nouveau prop pour piloter le graphique
 }
@@ -28,6 +36,15 @@ export default function DashboardOverview({ stats, showOnlySport }: Props) {
   const kcalBurned = Math.round(stats.calories);
   const kcalConsumed = Math.round(stats.consumed);
   const netKcal = kcalConsumed - kcalBurned;
+
+  const protEaten = Math.round(stats.consumedProteins || 0);
+  const carbsEaten = Math.round(stats.consumedCarbs || 0);
+  const fatsEaten = Math.round(stats.consumedFats || 0);
+
+  const goals = stats.goals;
+  const protGoal = goals?.proteins || 0;
+  const carbsGoal = goals?.carbs || 0;
+  const fatsGoal = goals?.fats || 0;
   
   const hasFullData = stats.dailyStats && stats.dailyStats.length > 0;
 
@@ -36,6 +53,28 @@ export default function DashboardOverview({ stats, showOnlySport }: Props) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}m`;
+  };
+
+  const renderProgressBar = (label: string, eaten: number, goal: number, color: string) => {
+    const progress = goal > 0 ? Math.min(eaten / goal, 1) : 0;
+    const barWidth = progress * 100;
+
+    return (
+      <View style={styles.macroRow}>
+        <View style={styles.macroLabelContainer}>
+          <Text style={styles.macroRowLabel}>{label}</Text>
+          <Text style={styles.macroRowValue}>
+            <Text style={{ fontWeight: '900', color: '#111827' }}>{eaten}g</Text>
+            <Text style={{ color: '#9ca3af' }}> / {goal}g</Text>
+          </Text>
+        </View>
+        <View style={styles.barContainer}>
+          <View style={styles.barBg}>
+            <View style={[styles.barFill, { width: `${barWidth}%`, backgroundColor: color }]} />
+          </View>
+        </View>
+      </View>
+    );
   };
 
   // On adapte l'échelle max selon le mode pour que le graph reste lisible
@@ -127,7 +166,15 @@ export default function DashboardOverview({ stats, showOnlySport }: Props) {
         </View>
       )}
 
-      {/* 2. BILAN CHIFFRÉ */}
+      {/* 2. OBJECTIFS MACROS */}
+      <Text style={styles.sectionTitle}>Objectifs Journaliers</Text>
+      <View style={styles.macroCard}>
+        {renderProgressBar("Protéines", protEaten, protGoal, "#10b981")}
+        {renderProgressBar("Glucides", carbsEaten, carbsGoal, "#f59e0b")}
+        {renderProgressBar("Lipides", fatsEaten, fatsGoal, "#6366f1")}
+      </View>
+
+      {/* 3. BILAN CHIFFRÉ */}
       <Text style={styles.sectionTitle}>Bilan {showOnlySport ? "Sportif" : "Énergétique"}</Text>
       <View style={styles.mainStats}>
         <View style={styles.kcalCard}>
@@ -279,4 +326,21 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 18, fontWeight: "800", color: "#111827", marginBottom: 4 },
   statLabel: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
+
+  macroCard: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  macroRow: { marginBottom: 16 },
+  macroLabelContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  macroRowLabel: { fontSize: 14, fontWeight: '700', color: '#4b5563' },
+  macroRowValue: { fontSize: 13 },
+  barContainer: { height: 8, width: '100%' },
+  barBg: { height: '100%', backgroundColor: '#f3f4f6', borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4 },
 });

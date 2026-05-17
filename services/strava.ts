@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { StravaActivity } from "../types/strava";
@@ -60,14 +60,27 @@ const request = async <T>(path: string, token?: string): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-export const getStoredApiToken = async () => AsyncStorage.getItem(API_TOKEN_KEY);
+export const getStoredApiToken = async () => {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem(API_TOKEN_KEY);
+  }
+  return SecureStore.getItemAsync(API_TOKEN_KEY);
+};
 
 export const saveApiToken = async (token: string) => {
-  await AsyncStorage.setItem(API_TOKEN_KEY, token);
+  if (Platform.OS === 'web') {
+    localStorage.setItem(API_TOKEN_KEY, token);
+    return;
+  }
+  await SecureStore.setItemAsync(API_TOKEN_KEY, token);
 };
 
 export const clearApiToken = async () => {
-  await AsyncStorage.removeItem(API_TOKEN_KEY);
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(API_TOKEN_KEY);
+    return;
+  }
+  await SecureStore.removeItemAsync(API_TOKEN_KEY);
 };
 
 export const fetchBackendStravaAuthUrl = async (

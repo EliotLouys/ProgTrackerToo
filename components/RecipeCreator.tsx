@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -11,15 +11,16 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { searchFood, createRecipe, RecipeIngredient } from "../services/nutrition";
+import { searchFood, createRecipe, updateRecipe, Recipe, RecipeIngredient } from "../services/nutrition";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialRecipe?: Recipe | null;
 }
 
-export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
+export default function RecipeCreator({ visible, onClose, onSuccess, initialRecipe }: Props) {
   const [recipeName, setRecipeName] = useState("");
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
   const [query, setQuery] = useState("");
@@ -27,6 +28,15 @@ export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
   const [ingredientQty, setIngredientQty] = useState("100");
+
+  useEffect(() => {
+    if (initialRecipe) {
+      setRecipeName(initialRecipe.name);
+      setIngredients(initialRecipe.ingredients);
+    } else {
+      resetForm();
+    }
+  }, [initialRecipe, visible]);
 
   const performSearch = async () => {
     if (query.trim().length < 3 || loading) return;
@@ -65,7 +75,12 @@ export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
   const handleSaveRecipe = async () => {
     if (!recipeName || ingredients.length === 0) return;
     try {
-      await createRecipe({ name: recipeName, ingredients });
+      const recipeData = { name: recipeName, ingredients };
+      if (initialRecipe) {
+        await updateRecipe(initialRecipe.id, recipeData);
+      } else {
+        await createRecipe(recipeData);
+      }
       resetForm();
       onSuccess();
     } catch (err) {
@@ -89,7 +104,7 @@ export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
     <Modal visible={visible} animationType="slide">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Nouvelle Recette</Text>
+          <Text style={styles.title}>{initialRecipe ? "Modifier la Recette" : "Nouvelle Recette"}</Text>
           <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
@@ -198,7 +213,7 @@ export default function RecipeCreator({ visible, onClose, onSuccess }: Props) {
             onPress={handleSaveRecipe}
             disabled={!recipeName || ingredients.length === 0}
           >
-            <Text style={styles.saveBtnText}>ENREGISTRER LA RECETTE</Text>
+            <Text style={styles.saveBtnText}>{initialRecipe ? "METTRE À JOUR" : "ENREGISTRER LA RECETTE"}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -233,7 +248,7 @@ const styles = StyleSheet.create({
   addBox: { backgroundColor: "#f9fafb", padding: 15, borderRadius: 12, marginTop: 15, borderWidth: 1, borderColor: "#e5e7eb" },
   selectedIngName: { fontSize: 15, fontWeight: "700", marginBottom: 15, color: "#fc4c02" },
   qtyRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 15 },
-  qtyInput: { backgroundColor: "#fff", borderWeight: 1, borderColor: "#d1d5db", padding: 10, borderRadius: 8, width: 80, textAlign: "center", fontSize: 16, fontWeight: "700" },
+  qtyInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#d1d5db", padding: 10, borderRadius: 8, width: 80, textAlign: "center", fontSize: 16, fontWeight: "700" },
   unit: { color: "#6b7280", fontWeight: "600" },
   btnRow: { flexDirection: "row", gap: 10 },
   cancelBtn: { flex: 1, padding: 12, alignItems: "center" },

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -10,31 +10,51 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { createCustomFood } from "../services/nutrition";
+import { createCustomFood, updateCustomFood, CustomFood } from "../services/nutrition";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialFood?: CustomFood | null;
 }
 
-export default function FoodCreator({ visible, onClose, onSuccess }: Props) {
+export default function FoodCreator({ visible, onClose, onSuccess, initialFood }: Props) {
   const [name, setName] = useState("");
   const [kcal, setKcal] = useState("");
   const [proteins, setProteins] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fats, setFats] = useState("");
 
+  useEffect(() => {
+    if (initialFood) {
+      setName(initialFood.name);
+      setKcal(initialFood.kcalPer100g.toString());
+      setProteins(initialFood.proteins?.toString() || "");
+      setCarbs(initialFood.carbs?.toString() || "");
+      setFats(initialFood.fats?.toString() || "");
+    } else {
+      resetForm();
+    }
+  }, [initialFood, visible]);
+
   const handleSave = async () => {
     if (!name || !kcal) return;
     try {
-      await createCustomFood({
+      const foodData = {
         name,
         kcalPer100g: parseFloat(kcal) || 0,
         proteins: parseFloat(proteins) || 0,
         carbs: parseFloat(carbs) || 0,
         fats: parseFloat(fats) || 0,
-      });
+      };
+
+      if (initialFood) {
+        await updateCustomFood(initialFood.id, foodData);
+      } else {
+        await createCustomFood(foodData);
+      }
+      
       resetForm();
       onSuccess();
     } catch (err) {
@@ -54,7 +74,7 @@ export default function FoodCreator({ visible, onClose, onSuccess }: Props) {
     <Modal visible={visible} animationType="slide">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Nouvel Aliment</Text>
+          <Text style={styles.title}>{initialFood ? "Modifier l'Aliment" : "Nouvel Aliment"}</Text>
           <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
@@ -120,7 +140,7 @@ export default function FoodCreator({ visible, onClose, onSuccess }: Props) {
             onPress={handleSave}
             disabled={!name || !kcal}
           >
-            <Text style={styles.saveBtnText}>ENREGISTRER L'ALIMENT</Text>
+            <Text style={styles.saveBtnText}>{initialFood ? "METTRE À JOUR" : "ENREGISTRER L'ALIMENT"}</Text>
           </TouchableOpacity>
         </View>
       </View>

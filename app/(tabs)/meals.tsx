@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { format, addDays, subDays, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { fetchMeals, MealLog, deleteMeal } from "../../services/nutrition";
@@ -29,7 +30,6 @@ export default function MealsScreen() {
   const loadMeals = async () => {
     setLoading(true);
     try {
-      // On s'assure d'envoyer la date sans le décalage horaire parasite
       const data = await fetchMeals(selectedDate);
       setMeals(data);
     } catch (err) {
@@ -59,99 +59,102 @@ export default function MealsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Journal</Text>
-        
-        <View style={styles.dateBar}>
-          <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowBtn}>
-            <Text style={styles.arrowText}>◀</Text>
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Journal</Text>
           
-          <TouchableOpacity 
-            style={styles.dateSelector}
-            onPress={() => setSelectedDate(startOfDay(new Date()))}
-          >
-            <Text style={styles.dateText}>
-              {format(selectedDate, "EEEE d MMMM", { locale: fr })}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.dateBar}>
+            <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowBtn}>
+              <Text style={styles.arrowText}>◀</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.dateSelector}
+              onPress={() => setSelectedDate(startOfDay(new Date()))}
+            >
+              <Text style={styles.dateText}>
+                {format(selectedDate, "EEEE d MMMM", { locale: fr })}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowBtn}>
-            <Text style={styles.arrowText}>▶</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowBtn}>
+              <Text style={styles.arrowText}>▶</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      {loading && meals.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#fc4c02" />
-        </View>
-      ) : (
-        <ScrollView style={styles.scroll}>
-          {MEAL_TYPES.map((type) => {
-            const typeMeals = getMealsByType(type.value);
-            const totalKcal = typeMeals.reduce((sum, m) => sum + m.totalCalories, 0);
+        {loading && meals.length === 0 ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#fc4c02" />
+          </View>
+        ) : (
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+            {MEAL_TYPES.map((type) => {
+              const typeMeals = getMealsByType(type.value);
+              const totalKcal = typeMeals.reduce((sum, m) => sum + m.totalCalories, 0);
 
-            return (
-              <View key={type.value} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>
-                    {type.icon} {type.label}
-                  </Text>
-                  <Text style={styles.sectionKcal}>{Math.round(totalKcal)} kcal</Text>
-                </View>
-                {typeMeals.length > 0 ? (
-                  typeMeals.map((meal) => (
-                    <View key={meal.id} style={styles.mealItem}>
-                      <View style={styles.mealInfo}>
-                        <Text style={styles.mealName}>{meal.name}</Text>
-                        <Text style={styles.mealDetails}>
-                          {meal.quantityGrams}g • {Math.round(meal.totalCalories)} kcal
-                        </Text>
+              return (
+                <View key={type.value} style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                      {type.icon} {type.label}
+                    </Text>
+                    <Text style={styles.sectionKcal}>{Math.round(totalKcal)} kcal</Text>
+                  </View>
+                  {typeMeals.length > 0 ? (
+                    typeMeals.map((meal) => (
+                      <View key={meal.id} style={styles.mealItem}>
+                        <View style={styles.mealInfo}>
+                          <Text style={styles.mealName}>{meal.name}</Text>
+                          <Text style={styles.mealDetails}>
+                            {meal.quantityGrams}g • {Math.round(meal.totalCalories)} kcal
+                          </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleDelete(meal.id)}>
+                          <Text style={styles.deleteBtn}>🗑️</Text>
+                        </TouchableOpacity>
                       </View>
-                      <TouchableOpacity onPress={() => handleDelete(meal.id)}>
-                        <Text style={styles.deleteBtn}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.emptyText}>Rien pour le moment</Text>
-                )}
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() => {
-                    setActiveType(type.value);
-                    setIsLoggerVisible(true);
-                  }}
-                >
-                  <Text style={styles.addBtnText}>+ AJOUTER</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      )}
+                    ))
+                  ) : (
+                    <Text style={styles.emptyText}>Rien pour le moment</Text>
+                  )}
+                  <TouchableOpacity
+                    style={styles.addBtn}
+                    onPress={() => {
+                      setActiveType(type.value);
+                      setIsLoggerVisible(true);
+                    }}
+                  >
+                    <Text style={styles.addBtnText}>+ AJOUTER</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
 
-      <MealLogger
-        visible={isLoggerVisible}
-        onClose={() => setIsLoggerVisible(false)}
-        onLogSuccess={() => {
-          setIsLoggerVisible(false);
-          loadMeals();
-        }}
-        mealType={activeType}
-        date={selectedDate}
-      />
-    </View>
+        <MealLogger
+          visible={isLoggerVisible}
+          onClose={() => setIsLoggerVisible(false)}
+          onLogSuccess={() => {
+            setIsLoggerVisible(false);
+            loadMeals();
+          }}
+          mealType={activeType}
+          date={selectedDate}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: "#fff" },
   container: { flex: 1, backgroundColor: "#f3f4f6" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { padding: 20, paddingTop: 60, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
+  header: { padding: 20, paddingTop: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
   title: { fontSize: 28, fontWeight: "900", color: "#111827", textAlign: 'center' },
   dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15 },
   dateSelector: { paddingHorizontal: 20 },

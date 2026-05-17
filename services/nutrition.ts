@@ -4,7 +4,15 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const request = async <T>(path: string, method = "GET", body?: any): Promise<T> => {
   const token = await getStoredApiToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  
+  // Cache busting pour les requêtes GET sur React Native
+  let url = `${API_BASE_URL}${path}`;
+  if (method === "GET") {
+    const separator = url.includes("?") ? "&" : "?";
+    url = `${url}${separator}_t=${Date.now()}`;
+  }
+
+  const response = await fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -70,8 +78,8 @@ export interface MealLog {
   consumedAt: string;
 }
 
-export const searchFood = async (query: string, recipes = false): Promise<CiqualItem[]> => {
-  return request<CiqualItem[]>(`/food/search?q=${encodeURIComponent(query)}&recipes=${recipes}`);
+export const searchFood = async (query: string, recipes = false, page = 1): Promise<CiqualItem[]> => {
+  return request<CiqualItem[]>(`/food/search?q=${encodeURIComponent(query)}&recipes=${recipes}&page=${page}`);
 };
 
 export const listRecipes = async (): Promise<Recipe[]> => {
@@ -80,6 +88,10 @@ export const listRecipes = async (): Promise<Recipe[]> => {
 
 export const createRecipe = async (recipe: { name: string; ingredients: RecipeIngredient[] }): Promise<Recipe> => {
   return request<Recipe>("/recipes", "POST", recipe);
+};
+
+export const updateRecipe = async (id: string, recipe: { name: string; ingredients: RecipeIngredient[] }): Promise<Recipe> => {
+  return request<Recipe>(`/recipes/${id}`, "PUT", recipe);
 };
 
 export const deleteRecipe = async (id: string): Promise<void> => {
@@ -93,6 +105,9 @@ export const fetchOFFProduct = async (barcode: string): Promise<any> => {
 export const logMeal = async (meal: {
   name: string;
   kcalPer100g: number;
+  proteins?: number;
+  carbs?: number;
+  fats?: number;
   quantityGrams: number;
   source: string;
   externalId?: string | number;
@@ -121,6 +136,10 @@ export const createCustomFood = async (food: Omit<CustomFood, "id">): Promise<Cu
   return request<CustomFood>("/food/custom", "POST", food);
 };
 
+export const updateCustomFood = async (id: string, food: Partial<CustomFood>): Promise<CustomFood> => {
+  return request<CustomFood>(`/food/custom/${id}`, "PUT", food);
+};
+
 export const deleteCustomFood = async (id: string): Promise<void> => {
   return request<void>(`/food/custom/${id}`, "DELETE");
 };
@@ -146,6 +165,9 @@ export interface UserProfile {
   age: number | null;
   gender: "MALE" | "FEMALE";
   activityLevel: "SEDENTARY" | "LIGHTLY_ACTIVE" | "MODERATELY_ACTIVE" | "VERY_ACTIVE" | "EXTRA_ACTIVE";
+  proteinsGoal: number | null;
+  carbsGoal: number | null;
+  fatsGoal: number | null;
 }
 
 export const fetchProfile = async (): Promise<UserProfile> => {

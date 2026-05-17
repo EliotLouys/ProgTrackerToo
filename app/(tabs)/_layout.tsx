@@ -6,20 +6,31 @@ import { StravaProvider } from "../../context/StravaContext";
 export default function TabLayout() {
   return (
     <StravaProvider>
-      <Tabs screenOptions={{ tabBarActiveTintColor: "#fc4c02" }}>
-        <Tabs.Screen name="index" options={{ headerShown: false, href: null }} />
+      <Tabs
+        initialRouteName="dashboard"
+        screenOptions={{
+          tabBarActiveTintColor: "#fc4c02",
+          headerShown: false,
+        }}
+      >
         <Tabs.Screen
           name="dashboard"
           options={{
             title: "Dashboard",
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>Dashboard</Text>,
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>📈</Text>,
+            headerShown: false,
           }}
+        />
+        <Tabs.Screen
+          name="index"
+          options={{ headerShown: false, href: null }}
         />
         <Tabs.Screen
           name="history"
           options={{
             title: "Trajets",
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>🚲</Text>,
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -27,6 +38,7 @@ export default function TabLayout() {
           options={{
             title: "Repas",
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>🍱</Text>,
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -34,6 +46,7 @@ export default function TabLayout() {
           options={{
             title: "Mes Aliments",
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>🥗</Text>,
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -41,6 +54,7 @@ export default function TabLayout() {
           options={{
             title: "Profil",
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text>,
+            headerShown: false,
           }}
         />
       </Tabs>

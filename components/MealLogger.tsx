@@ -14,8 +14,9 @@ import {
   StatusBar,
 } from "react-native";
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { searchFood, fetchOFFProduct, logMeal, createCustomFood } from "../services/nutrition";
+import { searchFood, fetchOFFProduct, logMeal, createCustomFood, listCustomFoods, listRecipes } from "../services/nutrition";
 import RecipeCreator from "./RecipeCreator";
+import FoodCreator from "./FoodCreator";
 
 interface Props {
   visible: boolean;
@@ -29,9 +30,15 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [quantity, setQuantity] = useState("100");
-  const [isRecipeSearch, setIsRecipeSearch] = useState(false);
+  
+  // Tabs: 0 = Aliments (Search), 1 = Mes Aliments (Custom), 2 = Recettes
+  const [activeTab, setActiveTab] = useState(0);
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customKcal, setCustomKcal] = useState("");
@@ -40,14 +47,19 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   const [customFats, setCustomFats] = useState("");
   const [saveForFuture, setSaveForFuture] = useState(true);
   const [scanning, setScanning] = useState(false);
+  
   const [isRecipeCreatorVisible, setIsRecipeCreatorVisible] = useState(false);
+  const [isFoodCreatorVisible, setIsFoodCreatorVisible] = useState(false);
+  const [selectedFoodForEdit, setSelectedFoodForEdit] = useState<any>(null);
+  const [selectedRecipeForEdit, setSelectedRecipeForEdit] = useState<any>(null);
+
   const [permission, requestPermission] = useCameraPermissions();
 
   const scanAnim = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const handleEmptyStatePress = () => {
-    if (isRecipeSearch) {
+    if (activeTab === 2) {
       setIsRecipeCreatorVisible(true);
     } else {
       setCustomName(query);
@@ -56,37 +68,81 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
   };
 
   useEffect(() => {
-    if (scanning) {
-      loopRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(scanAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-          Animated.timing(scanAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
-        ])
-      );
-      loopRef.current.start();
-    } else {
-      if (loopRef.current) loopRef.current.stop();
-      scanAnim.setValue(0);
+    if (visible) {
+      if (activeTab === 1) loadCustomFoods();
+      if (activeTab === 2 && query.length < 3) loadRecipes();
     }
-    return () => { if (loopRef.current) loopRef.current.stop(); };
-  }, [scanning]);
+  }, [visible, activeTab, query]);
 
-  const performSearch = async () => {
-    if (query.trim().length < 3 || loading) return;
+  const loadCustomFoods = async () => {
     setLoading(true);
+    setResults([]);
     try {
-      if (!isRecipeSearch && /^\d{8,13}$/.test(query)) {
-        const product = await fetchOFFProduct(query);
-        setResults(product ? [{ ...product, source: "USER_FOOD", externalId: query }] : []);
-      } else {
-        const items = await searchFood(query, isRecipeSearch);
-        setResults(items.map(i => ({ ...i, externalId: (i as any).id || (i as any).externalId })));
-      }
+      const foods = await listCustomFoods();
+      setResults(foods.map(f => ({ ...f, externalId: f.id, source: "USER_FOOD" })));
+      setHasMore(false);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRecipes = async () => {
+    setLoading(true);
+    setResults([]);
+    try {
+      const recipes = await listRecipes();
+      setResults(recipes.map(r => ({ ...r, externalId: r.id, source: "RECIPE" })));
+      setHasMore(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performSearch = async (page = 1) => {
+    const isFirstPage = page === 1;
+    if (isFirstPage) {
+      if (query.trim().length < 3 || loading) return;
+      setLoading(true);
+      setSearchPage(1);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      if (activeTab === 0 && isFirstPage && /^\d{8,13}$/.test(query)) {
+        const product = await fetchOFFProduct(query);
+        const item = product ? [{ ...product, source: "USER_FOOD", externalId: query }] : [];
+        setResults(item);
+        setHasMore(false);
+      } else {
+        const isRecipe = activeTab === 2;
+        const items = await searchFood(query, isRecipe, page);
+        const formatted = items.map(i => ({ ...i, externalId: (i as any).id || (i as any).externalId }));
+        
+        if (isFirstPage) {
+          setResults(formatted);
+        } else {
+          setResults(prev => [...prev, ...formatted]);
+        }
+        
+        setHasMore(formatted.length >= 10); 
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = searchPage + 1;
+    setSearchPage(nextPage);
+    performSearch(nextPage);
   };
 
   const onBarcodeScanned = async ({ data }: { data: string }) => {
@@ -97,7 +153,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
     try {
       const product = await fetchOFFProduct(data);
       if (product) {
-        const item = { ...product, source: "USER_FOOD", externalId: data }; // Saved in shadow db now
+        const item = { ...product, source: "USER_FOOD", externalId: data };
         setResults([item]);
         setSelectedItem(item);
       }
@@ -113,27 +169,47 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
       if (isCustomMode) {
         let source = "CUSTOM";
         let externalId = undefined;
+        const p = parseFloat(customProteins) || 0;
+        const c = parseFloat(customCarbs) || 0;
+        const f = parseFloat(customFats) || 0;
+        const k = parseFloat(customKcal) || 0;
+
         if (saveForFuture) {
           const newFood = await createCustomFood({
             name: customName,
-            kcalPer100g: parseFloat(customKcal) || 0,
-            proteins: parseFloat(customProteins) || 0,
-            carbs: parseFloat(customCarbs) || 0,
-            fats: parseFloat(customFats) || 0,
+            kcalPer100g: k,
+            proteins: p,
+            carbs: c,
+            fats: f,
           });
           source = "USER_FOOD";
           externalId = newFood.id;
         }
         await logMeal({
-          name: customName, kcalPer100g: parseFloat(customKcal) || 0,
-          quantityGrams: parseFloat(quantity) || 0, source, externalId, mealType, consumedAt: date,
+          name: customName, 
+          kcalPer100g: k,
+          proteins: p,
+          carbs: c,
+          fats: f,
+          quantityGrams: parseFloat(quantity) || 0, 
+          source, 
+          externalId, 
+          mealType, 
+          consumedAt: date,
         });
       } else {
         if (!selectedItem) return;
         await logMeal({
-          name: selectedItem.name, kcalPer100g: selectedItem.kcalPer100g,
-          quantityGrams: parseFloat(quantity) || 0, source: selectedItem.source,
-          externalId: String(selectedItem.externalId || ""), mealType, consumedAt: date,
+          name: selectedItem.name, 
+          kcalPer100g: selectedItem.kcalPer100g,
+          proteins: selectedItem.proteins,
+          carbs: selectedItem.carbs,
+          fats: selectedItem.fats,
+          quantityGrams: parseFloat(quantity) || 0, 
+          source: selectedItem.source,
+          externalId: String(selectedItem.externalId || ""), 
+          mealType, 
+          consumedAt: date,
         });
       }
       resetForm();
@@ -145,10 +221,12 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
 
   const resetForm = () => {
     setQuery(""); setResults([]); setSelectedItem(null); setQuantity("100");
-    setIsRecipeSearch(false);
+    setActiveTab(0);
     setIsCustomMode(false); setCustomName(""); setCustomKcal("");
     setCustomProteins(""); setCustomCarbs(""); setCustomFats("");
     setSaveForFuture(true); setScanning(false);
+    setSelectedFoodForEdit(null); setSelectedRecipeForEdit(null);
+    setIsFoodCreatorVisible(false); setIsRecipeCreatorVisible(false);
   };
 
   const translateY = scanAnim.interpolate({
@@ -176,42 +254,50 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
             <>
               <View style={styles.tabRow}>
                 <TouchableOpacity 
-                  style={[styles.tab, !isRecipeSearch && styles.tabActive]} 
-                  onPress={() => { setIsRecipeSearch(false); setResults([]); setQuery(""); }}
+                  style={[styles.tab, activeTab === 0 && styles.tabActive]} 
+                  onPress={() => { setActiveTab(0); setResults([]); setQuery(""); setHasMore(true); }}
                 >
-                  <Text style={[styles.tabText, !isRecipeSearch && styles.tabTextActive]}>Aliments</Text>
+                  <Text style={[styles.tabText, activeTab === 0 && styles.tabTextActive]}>Rechercher</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.tab, isRecipeSearch && styles.tabActive]} 
-                  onPress={() => { setIsRecipeSearch(true); setResults([]); setQuery(""); }}
+                  style={[styles.tab, activeTab === 1 && styles.tabActive]} 
+                  onPress={() => { setActiveTab(1); setQuery(""); }}
                 >
-                  <Text style={[styles.tabText, isRecipeSearch && styles.tabTextActive]}>Recettes</Text>
+                  <Text style={[styles.tabText, activeTab === 1 && styles.tabTextActive]}>Mes Aliments</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tab, activeTab === 2 && styles.tabActive]} 
+                  onPress={() => { setActiveTab(2); setResults([]); setQuery(""); setHasMore(true); }}
+                >
+                  <Text style={[styles.tabText, activeTab === 2 && styles.tabTextActive]}>Recettes</Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.searchRow}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder={isRecipeSearch ? "Rechercher une recette..." : "Rechercher (ex: Pomme, Riz...)"}
-                  value={query}
-                  onChangeText={setQuery}
-                  onSubmitEditing={performSearch}
-                  returnKeyType="search"
-                />
-                <TouchableOpacity style={styles.searchBtn} onPress={performSearch}>
-                  <Text style={styles.searchBtnIcon}>🔍</Text>
-                </TouchableOpacity>
-                {!isRecipeSearch && (
-                  <TouchableOpacity style={styles.scanBtn} onPress={async () => {
-                    if (!permission?.granted) await requestPermission();
-                    setScanning(true);
-                  }}>
-                    <Text style={styles.scanBtnIcon}>📷</Text>
+              {activeTab !== 1 && (
+                <View style={styles.searchRow}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder={activeTab === 2 ? "Rechercher une recette..." : "Rechercher (ex: Pomme, Riz...)"}
+                    value={query}
+                    onChangeText={setQuery}
+                    onSubmitEditing={() => performSearch(1)}
+                    returnKeyType="search"
+                  />
+                  <TouchableOpacity style={styles.searchBtn} onPress={() => performSearch(1)}>
+                    <Text style={styles.searchBtnIcon}>🔍</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                  {activeTab === 0 && (
+                    <TouchableOpacity style={styles.scanBtn} onPress={async () => {
+                      if (!permission?.granted) await requestPermission();
+                      setScanning(true);
+                    }}>
+                      <Text style={styles.scanBtnIcon}>📷</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
-              {!scanning && !isRecipeSearch && (
+              {activeTab === 0 && !scanning && (
                 <TouchableOpacity style={styles.customToggleBtn} onPress={() => setIsCustomMode(true)}>
                   <Text style={styles.customToggleText}>+ Ajouter un aliment personnalisé</Text>
                 </TouchableOpacity>
@@ -243,27 +329,62 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
               {loading ? (
                 <ActivityIndicator style={{ marginTop: 20 }} color="#fc4c02" />
               ) : !scanning && (
-                results.map((item, index) => (
-                  <TouchableOpacity key={index} style={styles.resultItem} onPress={() => setSelectedItem(item)}>
-                    <View style={styles.resultHeader}>
-                      <Text style={styles.resultName}>{item.name}</Text>
-                      {item.source && (
-                        <View style={[
-                          styles.sourceBadge, 
-                          { backgroundColor: item.source === 'USER_FOOD' ? '#dcfce7' : item.source === 'RECIPE' ? '#e0f2fe' : '#f3f4f6' }
-                        ]}>
-                          <Text style={[
-                            styles.sourceBadgeText, 
-                            { color: item.source === 'USER_FOOD' ? '#166534' : item.source === 'RECIPE' ? '#0369a1' : '#6b7280' }
-                          ]}>
-                            {item.source === 'USER_FOOD' ? 'MES ALIMENTS' : item.source === 'RECIPE' ? 'RECETTE' : item.source === 'CIQUAL' ? 'CIQUAL' : 'OFF'}
-                          </Text>
+                <>
+                  {results.map((item, index) => (
+                    <TouchableOpacity key={index} style={styles.resultItem} onPress={() => setSelectedItem(item)}>
+                      <View style={styles.resultHeader}>
+                        <Text style={styles.resultName}>{item.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          {(item.source === 'USER_FOOD' || item.source === 'RECIPE') && (
+                            <TouchableOpacity 
+                              style={styles.editBtnSmall} 
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                if (item.source === 'USER_FOOD') {
+                                  setSelectedFoodForEdit(item);
+                                  setIsFoodCreatorVisible(true);
+                                } else {
+                                  setSelectedRecipeForEdit(item);
+                                  setIsRecipeCreatorVisible(true);
+                                }
+                              }}
+                            >
+                              <Text style={styles.editIconSmall}>✏️</Text>
+                            </TouchableOpacity>
+                          )}
+                          {item.source && (
+                            <View style={[
+                              styles.sourceBadge, 
+                              { backgroundColor: item.source === 'USER_FOOD' ? '#dcfce7' : item.source === 'RECIPE' ? '#e0f2fe' : '#f3f4f6' }
+                            ]}>
+                              <Text style={[
+                                styles.sourceBadgeText, 
+                                { color: item.source === 'USER_FOOD' ? '#166534' : item.source === 'RECIPE' ? '#0369a1' : '#6b7280' }
+                              ]}>
+                                {item.source === 'USER_FOOD' ? 'MES ALIMENTS' : item.source === 'RECIPE' ? 'RECETTE' : item.source === 'CIQUAL' ? 'CIQUAL' : 'OFF'}
+                              </Text>
+                            </View>
+                          )}
                         </View>
+                      </View>
+                      <Text style={styles.resultKcal}>{Math.round(item.kcalPer100g)} kcal / 100g</Text>
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {hasMore && results.length > 0 && (
+                    <TouchableOpacity 
+                      style={styles.loadMoreBtn} 
+                      onPress={handleLoadMore}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? (
+                        <ActivityIndicator color="#fc4c02" />
+                      ) : (
+                        <Text style={styles.loadMoreText}>Voir plus de résultats</Text>
                       )}
-                    </View>
-                    <Text style={styles.resultKcal}>{Math.round(item.kcalPer100g)} kcal / 100g</Text>
-                  </TouchableOpacity>
-                ))
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
               
               {query.length >= 3 && results.length === 0 && !loading && !scanning && (
@@ -271,7 +392,7 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
                   <Text style={styles.emptyText}>Aucun résultat pour "{query}"</Text>
                   <TouchableOpacity style={styles.emptyCustomBtn} onPress={handleEmptyStatePress}>
                     <Text style={styles.emptyCustomBtnText}>
-                      {isRecipeSearch ? `Créer la recette "${query}"` : `Ajouter "${query}" manuellement`}
+                      {activeTab === 2 ? `Créer la recette "${query}"` : `Ajouter "${query}" manuellement`}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -329,10 +450,25 @@ export default function MealLogger({ visible, onClose, onLogSuccess, mealType, d
 
         <RecipeCreator 
           visible={isRecipeCreatorVisible}
-          onClose={() => setIsRecipeCreatorVisible(false)}
+          initialRecipe={selectedRecipeForEdit}
+          onClose={() => { setIsRecipeCreatorVisible(false); setSelectedRecipeForEdit(null); }}
           onSuccess={() => {
             setIsRecipeCreatorVisible(false);
-            performSearch(); // Refresh results to find the new recipe
+            setSelectedRecipeForEdit(null);
+            if (activeTab === 2) loadRecipes();
+            else performSearch(searchPage);
+          }}
+        />
+
+        <FoodCreator
+          visible={isFoodCreatorVisible}
+          initialFood={selectedFoodForEdit}
+          onClose={() => { setIsFoodCreatorVisible(false); setSelectedFoodForEdit(null); }}
+          onSuccess={() => {
+            setIsFoodCreatorVisible(false);
+            setSelectedFoodForEdit(null);
+            if (activeTab === 1) loadCustomFoods();
+            else performSearch(searchPage);
           }}
         />
       </View>
@@ -405,4 +541,8 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
   tabText: { fontSize: 14, fontWeight: "600", color: "#6b7280" },
   tabTextActive: { color: "#fc4c02" },
+  loadMoreBtn: { padding: 16, alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 12, marginTop: 10, borderStyle: 'dashed', borderWidth: 1, borderColor: '#d1d5db' },
+  loadMoreText: { color: '#fc4c02', fontWeight: '800', fontSize: 13 },
+  editBtnSmall: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  editIconSmall: { fontSize: 14 },
 });

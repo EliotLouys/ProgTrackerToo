@@ -5,6 +5,7 @@ import React, {
   useEffect,
   ReactNode,
   useMemo,
+  useCallback,
 } from "react";
 import { Alert, Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
@@ -63,7 +64,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  const loadActivities = async (authToken = token) => {
+  const loadActivities = useCallback(async (authToken = token) => {
     if (!authToken) {
       setActivities([]);
       setLoading(false);
@@ -84,15 +85,13 @@ export function StravaProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     try {
       setError(null);
       const appRedirectUri = resolveRedirectUri();
       const authUrl = await fetchBackendStravaAuthUrl(appRedirectUri);
-      console.log("authUrl", authUrl);
-      console.log("appRedirectUri", appRedirectUri);
       const result = await WebBrowser.openAuthSessionAsync(
         authUrl,
         appRedirectUri,
@@ -102,37 +101,27 @@ export function StravaProvider({ children }: { children: ReactNode }) {
       }
 
       const callbackUrl = new URL(result.url);
-      const stravaError = callbackUrl.searchParams.get("error");
-      if (stravaError) {
-        throw new Error(`Erreur Strava: ${stravaError}`);
-      }
-
       const apiToken = callbackUrl.searchParams.get("token");
       if (!apiToken || typeof apiToken !== "string") {
-        throw new Error(
-          `Token API introuvable dans le callback. Redirect utilisé: ${appRedirectUri}`,
-        );
+        throw new Error("Token API introuvable");
       }
 
       await saveApiToken(apiToken);
       setToken(apiToken);
       await loadActivities(apiToken);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Impossible de connecter le compte Strava.";
+      const message = err instanceof Error ? err.message : "Erreur de connexion";
       setError(message);
       Alert.alert("Connexion Strava", message);
     }
-  };
+  }, [loadActivities]);
 
-  const disconnect = async () => {
+  const disconnect = useCallback(async () => {
     await clearApiToken();
     setToken(null);
     setActivities([]);
     setError(null);
-  };
+  }, []);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -168,21 +157,21 @@ export function StravaProvider({ children }: { children: ReactNode }) {
     return activities.filter((act) => act.type === sportFilter);
   }, [activities, sportFilter]);
 
+  const value = useMemo(() => ({
+    activities,
+    filteredActivities,
+    sportFilter,
+    setSportFilter,
+    loading,
+    error,
+    isAuthenticated: Boolean(token),
+    connect,
+    disconnect,
+    refresh: loadActivities,
+  }), [activities, filteredActivities, sportFilter, loading, error, token, connect, disconnect, loadActivities]);
+
   return (
-    <StravaContext.Provider
-      value={{
-        activities,
-        filteredActivities,
-        sportFilter,
-        setSportFilter,
-        loading,
-        error,
-        isAuthenticated: Boolean(token),
-        connect,
-        disconnect,
-        refresh: loadActivities,
-      }}
-    >
+    <StravaContext.Provider value={value}>
       {children}
     </StravaContext.Provider>
   );
