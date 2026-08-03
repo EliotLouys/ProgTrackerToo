@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   StatusBar,
+  Alert,
 } from "react-native";
 import { searchFood, createRecipe, updateRecipe, Recipe, RecipeIngredient } from "../services/nutrition";
 
@@ -83,7 +84,8 @@ export default function RecipeCreator({ visible, onClose, onSuccess, initialReci
       }
       resetForm();
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
+      Alert.alert("Erreur", err.message || "Impossible d'enregistrer la recette.");
       console.error(err);
     }
   };
